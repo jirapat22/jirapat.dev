@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pat's System</title>
+<meta name="description" content="Pat's personal hub: the apps I build and use, as a little solar system.">
+<meta name="theme-color" content="#0B1026">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,800&family=Figtree:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* ── Design tokens ─────────────────────────────────────────────
+     One palette for the whole page. Each app gets its own planet
+     colour, used for its planet, its dot in the list and its focus ring. */
+  :root {
+    --night: #0B1026;      /* page background: deep navy, like a night sky */
+    --chart: #24305E;      /* orbit lines and dividers */
+    --starlight: #EDE6D3;  /* main text: warm off-white */
+    --dim: #8E95B8;        /* secondary text */
+    --sun: #FFC857;        /* the sun (Pat) */
+
+    --ironlog: #8AB4F8;
+    --plated: #7FD8A4;
+    --tasktime: #FF5C39;   /* TaskTime's own brand accent */
+    --orbit: #C3A6FF;
+
+    --display: "Bricolage Grotesque", system-ui, sans-serif;
+    --body: "Figtree", system-ui, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, monospace;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--night);
+    color: var(--starlight);
+    font: 400 16px/1.5 var(--body);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Page layout: orrery on the left, app list on the right.
+     On phones it stacks: orrery on top, list below. */
+  .page {
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: 40px 16px 32px;
+    display: grid;
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+    gap: 48px;
+    align-items: center;
+    min-height: 100vh;
+  }
+  @media (max-width: 820px) {
+    .page { grid-template-columns: 1fr; gap: 24px; padding-top: 24px; min-height: 0; }
+  }
+
+  /* ── The orrery (the clockwork solar system) ─────────────────── */
+  .orrery { width: 100%; max-width: 640px; aspect-ratio: 1; margin: 0 auto; display: block; }
+  .orrery .ring { fill: none; stroke: var(--chart); stroke-width: 1.2; stroke-dasharray: 2 5; opacity: .9; }
+  .orrery .ring.active { stroke: currentColor; stroke-dasharray: none; opacity: .55; }
+  .orrery .star { fill: var(--starlight); }
+  .orrery .planet { cursor: pointer; outline: none; }
+  .orrery .planet circle.body { transition: r .25s ease; }
+  .orrery .planet text {
+    font: 500 11px var(--mono); fill: var(--starlight);
+    opacity: 0; transition: opacity .2s; pointer-events: none;
+  }
+  .orrery .planet.active text { opacity: 1; }
+  .orrery .planet .halo { fill: none; stroke: currentColor; stroke-width: 1.5; opacity: 0; transition: opacity .2s; }
+  .orrery .planet.active .halo { opacity: .8; }
+  .orrery .sun-label { font: 800 15px var(--display); fill: var(--night); letter-spacing: .04em; }
+
+  /* ── Right column: heading + app list ───────────────────────── */
+  .eyebrow { font: 500 12px var(--mono); color: var(--dim); letter-spacing: .08em; margin: 0 0 12px; }
+  h1 {
+    font: 800 clamp(40px, 6vw, 64px)/0.95 var(--display);
+    letter-spacing: -0.02em;
+    margin: 0 0 16px;
+  }
+  h1 .sun-word { color: var(--sun); }
+  .intro { color: var(--dim); margin: 0 0 28px; max-width: 34ch; }
+
+  .apps { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--chart); }
+  .apps li { border-bottom: 1px solid var(--chart); }
+  .apps a {
+    display: grid;
+    grid-template-columns: 14px 1fr auto;
+    gap: 4px 14px;
+    align-items: baseline;
+    padding: 14px 4px;
+    color: inherit;
+    text-decoration: none;
+    border-radius: 6px;
+  }
+  .apps a:hover, .apps a.active { background: rgba(237, 230, 211, .04); }
+  .apps a:focus-visible { outline: 2px solid var(--c); outline-offset: 2px; }
+  .apps .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--c); align-self: center; }
+  .apps .name { font: 800 22px var(--display); }
+  .apps .go { font: 500 13px var(--mono); color: var(--c); }
+  .apps .what { grid-column: 2 / 4; color: var(--dim); font-size: 15px; }
+  .apps .data { grid-column: 2 / 4; font: 400 12px var(--mono); color: var(--dim); opacity: .8; }
+
+  .legend { font: 400 12px var(--mono); color: var(--dim); margin: 20px 0 0; line-height: 1.7; }
+  footer { grid-column: 1 / -1; font: 400 12px var(--mono); color: var(--dim); text-align: center; }
+  footer a { color: inherit; }
+</style>
+</head>
+<body>
+<main class="page">
+
+  <!-- The orrery is drawn by the script below. It's decorative-plus:
+       every planet is also a real link, and the list on the right holds
+       the same links for keyboard and screen-reader users. -->
+  <svg class="orrery" id="orrery" viewBox="-320 -320 640 640" role="img"
+       aria-label="Pat's apps drawn as planets orbiting a sun"></svg>
+
+  <section>
+    <p class="eyebrow">jirapat.dev</p>
+    <h1>Pat's little <span class="sun-word">solar system</span></h1>
+    <p class="intro">Four apps I built and use every day. Pick a planet.</p>
+
+    <ul class="apps" id="apps"></ul>
+
+    <p class="legend">
+      Closer to the sun = born earlier.<br>
+      Bigger planet = more commits.
+    </p>
+  </section>
+
+  <footer>Made in Auckland · <a href="https://github.com/jirapat22">github.com/jirapat22</a></footer>
+</main>
+
+<script>
+  // ── The apps ────────────────────────────────────────────────────
+  // Sorted by birth date (first git commit), oldest first. That order
+  // decides the orbit: the oldest app sits closest to the sun.
+  // `commits` decides planet size. Update these numbers whenever you like.
+  const APPS = [
+    { id: "ironlog",  name: "Ironlog",  url: "https://ironlog.jirapat.dev",
+      what: "Gym log: sets, PRs and programs.",            born: "21/04/2026", commits: 323 },
+    { id: "tasktime", name: "TaskTime", url: "https://tasktime.jirapat.dev",
+      what: "Tasks woven into my Google Calendar.",        born: "27/04/2026", commits: 164 },
+    { id: "plated",   name: "Plated",   url: "https://plated.jirapat.dev",
+      what: "Food diary: meals, macros and weigh-ins.",    born: "10/05/2026", commits: 340 },
+    { id: "orbit",    name: "Orbit",    url: "https://orbit.jirapat.dev",
+      what: "My life as a galaxy: people, projects, goals.", born: "30/05/2026", commits: 94 },
+  ];
+
+  const svg = document.getElementById("orrery");
+  const list = document.getElementById("apps");
+  const NS = "http://www.w3.org/2000/svg";
+  const el = (tag, attrs = {}) => {
+    const n = document.createElementNS(NS, tag);
+    for (const k in attrs) n.setAttribute(k, attrs[k]);
+    return n;
+  };
+  const colour = id => getComputedStyle(document.documentElement).getPropertyValue("--" + id).trim();
+
+  // ── Background stars ────────────────────────────────────────────
+  // A fixed "random" pattern (seeded), so the sky looks the same on every visit.
+  let seed = 22;
+  const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < 70; i++) {
+    svg.append(el("circle", {
+      class: "star", cx: rand() * 640 - 320, cy: rand() * 640 - 320,
+      r: rand() < 0.15 ? 1.2 : 0.6, opacity: 0.2 + rand() * 0.5,
+    }));
+  }
+
+  // ── Orbits + planets ────────────────────────────────────────────
+  const maxCommits = Math.max(...APPS.map(a => a.commits));
+  const planets = APPS.map((app, i) => {
+    const radius = 92 + i * 58;                          // ring distance from the sun
+    const size = 7 + 11 * Math.sqrt(app.commits / maxCommits); // sqrt so area ≈ commits
+    // Kepler's third law (simplified): further out = slower. Period ∝ r^1.5.
+    const period = 26 * Math.pow(radius / 92, 1.5);     // seconds per lap
+    const start = i * 2.4 + 0.6;                        // spread out (~137°, the "golden angle") so they never bunch up
+
+    const ring = el("circle", { class: "ring", r: radius, style: `color:${colour(app.id)}` });
+    svg.append(ring);
+
+    // Each planet is a real link you can click or tab to.
+    const link = el("a", { class: "planet", href: app.url, style: `color:${colour(app.id)}` });
+    link.setAttribute("aria-label", `Open ${app.name}`);
+    const halo = el("circle", { class: "halo", r: size + 6 });
+    const body = el("circle", { class: "body", r: size, fill: colour(app.id) });
+    const label = el("text", { x: 0, y: -(size + 10), "text-anchor": "middle" }); // above the planet, so it never runs off the edge
+    label.textContent = app.name;
+    link.append(halo, body, label);
+    svg.append(link);
+
+    return { app, ring, link, radius, period, start };
+  });
+
+  // The sun goes on top of the rings, in the centre.
+  // A soft glow: a radial gradient that fades from gold to transparent.
+  const defs = el("defs");
+  const grad = el("radialGradient", { id: "glow" });
+  grad.append(el("stop", { offset: "40%", "stop-color": colour("sun"), "stop-opacity": 0.35 }),
+              el("stop", { offset: "100%", "stop-color": colour("sun"), "stop-opacity": 0 }));
+  defs.append(grad);
+  svg.prepend(defs);
+  const sunGlow = el("circle", { r: 78, fill: "url(#glow)" });
+  const sun = el("circle", { r: 40, fill: colour("sun") });
+  const sunText = el("text", { class: "sun-label", "text-anchor": "middle", y: 5 });
+  sunText.textContent = "PAT";
+  svg.insertBefore(sunGlow, defs.nextSibling);
+  svg.append(sun, sunText);
+  // Keep planets drawn above the sun's glow but rings below everything.
+  planets.forEach(p => svg.append(p.link));
+
+  // ── The list on the right ───────────────────────────────────────
+  planets.forEach(p => {
+    const { app } = p;
+    const li = document.createElement("li");
+    li.innerHTML = `
+      <a href="${app.url}" style="--c: ${colour(app.id)}">
+        <span class="dot"></span>
+        <span class="name">${app.name}</span>
+        <span class="go">open ↗</span>
+        <span class="what">${app.what}</span>
+        <span class="data">born ${app.born} · ${app.commits} commits</span>
+      </a>`;
+    p.row = li.firstElementChild;
+    list.append(li);
+  });
+
+  // ── Highlighting ────────────────────────────────────────────────
+  // Hovering or focusing a planet OR its list row lights up both,
+  // and freezes that planet so it's easy to click.
+  let active = null;
+  const setActive = p => {
+    active = p;
+    planets.forEach(q => {
+      const on = q === p;
+      q.link.classList.toggle("active", on);
+      q.ring.classList.toggle("active", on);
+      q.row.classList.toggle("active", on);
+    });
+  };
+  planets.forEach(p => {
+    for (const target of [p.link, p.row]) {
+      target.addEventListener("mouseenter", () => setActive(p));
+      target.addEventListener("mouseleave", () => setActive(null));
+      target.addEventListener("focus", () => setActive(p));
+      target.addEventListener("blur", () => setActive(null));
+    }
+  });
+
+  // ── Motion ──────────────────────────────────────────────────────
+  // Planets move along their rings. If the visitor has asked their device
+  // for reduced motion, they stay still in their starting spots instead.
+  const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const angles = planets.map(p => p.start);
+  let last = performance.now();
+
+  function place() {
+    planets.forEach((p, i) => {
+      const x = Math.cos(angles[i]) * p.radius;
+      const y = Math.sin(angles[i]) * p.radius;
+      p.link.setAttribute("transform", `translate(${x.toFixed(1)} ${y.toFixed(1)})`);
+    });
+  }
+
+  function tick(now) {
+    const dt = Math.min((now - last) / 1000, 0.1); // seconds since last frame (capped after tab switches)
+    last = now;
+    planets.forEach((p, i) => {
+      if (p !== active) angles[i] += (Math.PI * 2 / p.period) * dt; // the hovered planet waits for you
+    });
+    place();
+    requestAnimationFrame(tick);
+  }
+
+  place();
+  if (!still) requestAnimationFrame(tick);
+</script>
+</body>
+</html>
