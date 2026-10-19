@@ -104,6 +104,59 @@
   .apps .data { grid-column: 2 / 4; font: 400 12px var(--mono); color: var(--dim); opacity: .8; }
 
   .legend { font: 400 12px var(--mono); color: var(--dim); margin: 20px 0 0; line-height: 1.7; }
+
+  /* ── Preview panel (opens when you pick a planet) ───────────── */
+  dialog.preview {
+    width: min(960px, calc(100vw - 32px));
+    max-height: calc(100vh - 32px);
+    padding: 0;
+    border: 1px solid var(--chart);
+    border-top: 3px solid var(--c);          /* the app's planet colour */
+    border-radius: 14px;
+    background: #10173A;                     /* a touch lighter than the night sky */
+    color: var(--starlight);
+    overflow: auto;
+  }
+  dialog.preview::backdrop { background: rgba(5, 8, 22, .72); }
+  .preview .head { display: flex; align-items: flex-start; gap: 16px; padding: 24px 24px 8px; }
+  .preview .head .dot { width: 14px; height: 14px; border-radius: 50%; background: var(--c); margin-top: 12px; flex: none; }
+  .preview h2 { font: 800 34px/1.1 var(--display); margin: 0; }
+  .preview .what { color: var(--dim); margin: 4px 0 0; }
+  .preview .close {
+    margin-left: auto; flex: none;
+    width: 40px; height: 40px; border-radius: 50%;
+    border: 1px solid var(--chart); background: none; color: var(--starlight);
+    font: 400 20px var(--body); cursor: pointer;
+  }
+  .preview .close:focus-visible { outline: 2px solid var(--c); outline-offset: 2px; }
+  .preview .blurb { padding: 0 24px; margin: 8px 0 4px; max-width: 62ch; }
+  .preview .stack { padding: 0 24px; font: 400 12px var(--mono); color: var(--dim); margin: 0 0 16px; }
+
+  /* Screenshot strip: swipe/scroll sideways, each shot snaps into place. */
+  .preview .strip {
+    display: flex; gap: 14px; overflow-x: auto;
+    padding: 4px 24px 12px;
+    scroll-snap-type: x mandatory; scroll-padding: 0 24px;
+  }
+  .preview .strip img {
+    height: min(58vh, 540px); width: auto; flex: none;
+    border-radius: 12px; border: 1px solid var(--chart);
+    scroll-snap-align: start; background: #000;
+  }
+  .preview .foot {
+    display: flex; justify-content: space-between; align-items: center; gap: 12px;
+    padding: 8px 24px 18px; font: 400 12px var(--mono); color: var(--dim);
+  }
+  /* The "hidden" link to the real app: there if you know to look. */
+  .preview .real { color: var(--dim); opacity: .35; text-decoration: none; }
+  .preview .real:hover, .preview .real:focus-visible { opacity: 1; color: var(--c); }
+  @media (max-width: 600px) {
+    .preview .head { padding: 18px 16px 6px; }
+    .preview h2 { font-size: 28px; }
+    .preview .blurb, .preview .stack, .preview .foot { padding-left: 16px; padding-right: 16px; }
+    .preview .strip { padding: 4px 16px 12px; scroll-padding: 0 16px; }
+    .preview .strip img { height: 52vh; }
+  }
   footer { grid-column: 1 / -1; font: 400 12px var(--mono); color: var(--dim); text-align: center; }
   footer a { color: inherit; }
 </style>
@@ -111,16 +164,16 @@
 <body>
 <main class="page">
 
-  <!-- The orrery is drawn by the script below. It's decorative-plus:
-       every planet is also a real link, and the list on the right holds
-       the same links for keyboard and screen-reader users. -->
+  <!-- The orrery is drawn by the script below. Every planet opens that
+       app's preview, and the list on the right does the same for keyboard
+       and screen-reader users. -->
   <svg class="orrery" id="orrery" viewBox="-320 -320 640 640" role="img"
        aria-label="Pat's apps drawn as planets orbiting a sun"></svg>
 
   <section>
     <p class="eyebrow">jirapat.dev</p>
     <h1>Pat's little <span class="sun-word">solar system</span></h1>
-    <p class="intro">Four apps I built and use every day. Pick a planet.</p>
+    <p class="intro">Four apps I built and use every day. Pick a planet for a peek inside.</p>
 
     <ul class="apps" id="apps"></ul>
 
@@ -133,20 +186,59 @@
   <footer>Made in Auckland · <a href="https://github.com/jirapat22">github.com/jirapat22</a></footer>
 </main>
 
+<!-- One reusable preview panel; the script fills it in for whichever app you pick.
+     <dialog> gives us Escape-to-close and focus handling for free. -->
+<dialog class="preview" id="preview" aria-labelledby="pv-name">
+  <div class="head">
+    <span class="dot"></span>
+    <div>
+      <h2 id="pv-name"></h2>
+      <p class="what" id="pv-what"></p>
+    </div>
+    <button class="close" id="pv-close" aria-label="Close preview">×</button>
+  </div>
+  <p class="blurb" id="pv-blurb"></p>
+  <p class="stack" id="pv-stack"></p>
+  <div class="strip" id="pv-strip"></div>
+  <div class="foot">
+    <span>Screenshots use made-up sample data.</span>
+    <a class="real" id="pv-real" href="#">open app ↗</a>
+  </div>
+</dialog>
+
 <script>
   // ── The apps ────────────────────────────────────────────────────
   // Sorted by birth date (first git commit), oldest first. That order
   // decides the orbit: the oldest app sits closest to the sun.
   // `commits` decides planet size. Update these numbers whenever you like.
+  // `shots` are screenshots taken from a demo copy with made-up data (in /shots).
   const APPS = [
     { id: "ironlog",  name: "Ironlog",  url: "https://ironlog.jirapat.dev",
-      what: "Gym log: sets, PRs and programs.",            born: "21/04/2026", commits: 323 },
+      what: "Gym log: sets, PRs and programs.",            born: "21/04/2026", commits: 323,
+      blurb: "A gym tracker for my phone. Log sets with sweaty thumbs, follow a Push / Pull / Legs plan, and watch strength and bodyweight trend over time. It keeps working offline in the gym basement.",
+      stack: "Node · Express · SQLite · installable web app (PWA)",
+      shots: [["ironlog-1-programs", "Programs screen with this week's muscle groups"],
+              ["ironlog-2-progress", "Bodyweight chart trending down over eight weeks"],
+              ["ironlog-3-history", "Workout history with sets and total volume"]] },
     { id: "tasktime", name: "TaskTime", url: "https://tasktime.jirapat.dev",
-      what: "Tasks woven into my Google Calendar.",        born: "27/04/2026", commits: 164 },
+      what: "Tasks woven into my Google Calendar.",        born: "27/04/2026", commits: 164,
+      blurb: "My to-do list and my calendar in one place. Tasks get real time slots on a week grid, lists keep the loose ends, and it adds travel time before anything with a location.",
+      stack: "Next.js · Prisma · Postgres · Google Calendar API",
+      shots: [["tasktime-2-week", "Week grid with tasks scheduled as time blocks"],
+              ["tasktime-3-lists", "Checklists grouped into Work, Side projects and Home"]] },
     { id: "plated",   name: "Plated",   url: "https://plated.jirapat.dev",
-      what: "Food diary: meals, macros and weigh-ins.",    born: "10/05/2026", commits: 340 },
+      what: "Food diary: meals, macros and weigh-ins.",    born: "10/05/2026", commits: 340,
+      blurb: "A food diary built on New Zealand's food database (about 4,800 foods). It tracks calories and macros, and checks whether a cut is actually working from real weigh-ins, not guesses.",
+      stack: "Node · Express · SQLite · installable web app (PWA)",
+      shots: [["plated-1-today", "Today's calorie ring and macro bars"],
+              ["plated-2-trends", "Trends card saying the cut is on track"],
+              ["plated-3-history", "A past day's meals and totals"]] },
     { id: "orbit",    name: "Orbit",    url: "https://orbit.jirapat.dev",
-      what: "My life as a galaxy: people, projects, goals.", born: "30/05/2026", commits: 94 },
+      what: "My life as a galaxy: people, projects, goals.", born: "30/05/2026", commits: 94,
+      blurb: "My life map. I'm the sun; projects, goals, interests and people orbit around me, and my other apps report into it, so it doubles as their dashboard.",
+      stack: "Next.js · Postgres + pgvector · Canvas · Gemini",
+      shots: [["orbit-1-galaxy", "The galaxy view with planets and moons around the sun"],
+              ["orbit-2-overview", "Overview board listing every node by category"]] },
   ];
 
   const svg = document.getElementById("orrery");
@@ -182,9 +274,10 @@
     const ring = el("circle", { class: "ring", r: radius, style: `color:${colour(app.id)}` });
     svg.append(ring);
 
-    // Each planet is a real link you can click or tab to.
-    const link = el("a", { class: "planet", href: app.url, style: `color:${colour(app.id)}` });
-    link.setAttribute("aria-label", `Open ${app.name}`);
+    // Each planet is a link you can click or tab to. It points at #ironlog etc.,
+    // which opens that app's preview (and makes the preview shareable).
+    const link = el("a", { class: "planet", href: `#${app.id}`, style: `color:${colour(app.id)}` });
+    link.setAttribute("aria-label", `Preview ${app.name}`);
     const halo = el("circle", { class: "halo", r: size + 6 });
     const body = el("circle", { class: "body", r: size, fill: colour(app.id) });
     const label = el("text", { x: 0, y: -(size + 10), "text-anchor": "middle" }); // above the planet, so it never runs off the edge
@@ -217,10 +310,10 @@
     const { app } = p;
     const li = document.createElement("li");
     li.innerHTML = `
-      <a href="${app.url}" style="--c: ${colour(app.id)}">
+      <a href="#${app.id}" style="--c: ${colour(app.id)}">
         <span class="dot"></span>
         <span class="name">${app.name}</span>
-        <span class="go">open ↗</span>
+        <span class="go">peek →</span>
         <span class="what">${app.what}</span>
         <span class="data">born ${app.born} · ${app.commits} commits</span>
       </a>`;
@@ -277,6 +370,44 @@
 
   place();
   if (!still) requestAnimationFrame(tick);
+
+  // ── Preview panel ───────────────────────────────────────────────
+  // The URL hash decides what's open: "#plated" shows Plated's preview,
+  // no hash means closed. So Back closes it, and links can be shared.
+  const dlg = document.getElementById("preview");
+  const $ = id => document.getElementById(id);
+
+  function showPreview(app) {
+    dlg.style.setProperty("--c", colour(app.id));
+    $("pv-name").textContent = app.name;
+    $("pv-what").textContent = app.what;
+    $("pv-blurb").textContent = app.blurb;
+    $("pv-stack").textContent = app.stack;
+    $("pv-real").href = app.url;
+    $("pv-strip").replaceChildren(...app.shots.map(([file, alt]) => {
+      const img = document.createElement("img");
+      img.src = `shots/${file}.webp`;
+      img.alt = alt;
+      img.loading = "lazy";
+      return img;
+    }));
+    $("pv-strip").scrollLeft = 0;
+    if (!dlg.open) dlg.showModal();
+  }
+
+  function syncToHash() {
+    const app = APPS.find(a => "#" + a.id === location.hash);
+    if (app) showPreview(app);
+    else if (dlg.open) dlg.close();
+  }
+  window.addEventListener("hashchange", syncToHash);
+  syncToHash(); // handle a shared link like jirapat.dev/#orbit
+
+  // Closing (× button, Escape, or a click on the dark backdrop) clears the hash.
+  const clearHash = () => history.replaceState(null, "", location.pathname);
+  $("pv-close").addEventListener("click", () => dlg.close());
+  dlg.addEventListener("close", clearHash);
+  dlg.addEventListener("click", e => { if (e.target === dlg) dlg.close(); }); // backdrop click
 </script>
 </body>
 </html>
