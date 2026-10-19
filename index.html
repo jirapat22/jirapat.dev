@@ -24,6 +24,7 @@
     --ironlog: #8AB4F8;
     --plated: #7FD8A4;
     --tasktime: #FF5C39;   /* TaskTime's own brand accent */
+    --nook: #F28FB0;       /* rose: warm like Nook's own palette, but clear of TaskTime's orange */
     --orbit: #C3A6FF;
 
     --display: "Bricolage Grotesque", system-ui, sans-serif;
@@ -173,7 +174,7 @@
   <section>
     <p class="eyebrow">jirapat.dev</p>
     <h1>Pat's little <span class="sun-word">solar system</span></h1>
-    <p class="intro">Four apps I built and use every day. Pick a planet for a peek inside.</p>
+    <p class="intro">Five apps I built and use every day. Pick a planet for a peek inside.</p>
 
     <ul class="apps" id="apps"></ul>
 
@@ -215,6 +216,7 @@
   const APPS = [
     { id: "ironlog",  name: "Ironlog",  url: "https://ironlog.jirapat.dev",
       what: "Gym log: sets, PRs and programs.",            born: "21/04/2026", commits: 323,
+
       blurb: "A gym tracker for my phone. Log sets with sweaty thumbs, follow a Push / Pull / Legs plan, and watch strength and bodyweight trend over time. It keeps working offline in the gym basement.",
       stack: "Node · Express · SQLite · installable web app (PWA)",
       shots: [["ironlog-1-programs", "Programs screen with this week's muscle groups"],
@@ -233,8 +235,15 @@
       shots: [["plated-1-today", "Today's calorie ring and macro bars"],
               ["plated-2-trends", "Trends card saying the cut is on track"],
               ["plated-3-history", "A past day's meals and totals"]] },
+    { id: "nook",     name: "Nook",     url: "https://nook.jirapat.dev",
+      what: "Journal: talk or type, it spots the patterns.", born: "25/05/2026", commits: 134,
+      blurb: "A private journal I can talk to. I speak or type about my day, and it picks out moods, activities and the people I mention, then shows streaks and mood trends over time.",
+      stack: "Node · Express · Postgres · Groq AI · installable web app (PWA)",
+      shots: [["nook-1-home", "Home screen with a writing streak and recent days"],
+              ["nook-2-insights", "Insights with mood trends over a week"],
+              ["nook-3-people", "People mentioned in the journal, grouped by relationship"]] },
     { id: "orbit",    name: "Orbit",    url: "https://orbit.jirapat.dev",
-      what: "My life as a galaxy: people, projects, goals.", born: "30/05/2026", commits: 94,
+      what: "My life as a galaxy: people, projects, goals.", born: "30/05/2026", commits: 95,
       blurb: "My life map. I'm the sun; projects, goals, interests and people orbit around me, and my other apps report into it, so it doubles as their dashboard.",
       stack: "Next.js · Postgres + pgvector · Canvas · Gemini",
       shots: [["orbit-1-galaxy", "The galaxy view with planets and moons around the sun"],
@@ -265,10 +274,12 @@
   // ── Orbits + planets ────────────────────────────────────────────
   const maxCommits = Math.max(...APPS.map(a => a.commits));
   const planets = APPS.map((app, i) => {
-    const radius = 92 + i * 58;                          // ring distance from the sun
-    const size = 7 + 11 * Math.sqrt(app.commits / maxCommits); // sqrt so area ≈ commits
+    // Rings share the space between the sun (~80) and the edge (~285), so
+    // adding a sixth app squeezes them closer instead of pushing one off-screen.
+    const radius = 80 + i * (205 / Math.max(APPS.length - 1, 1)); // ring distance from the sun
+    const size = 6 + 10 * Math.sqrt(app.commits / maxCommits); // sqrt so area ≈ commits
     // Kepler's third law (simplified): further out = slower. Period ∝ r^1.5.
-    const period = 26 * Math.pow(radius / 92, 1.5);     // seconds per lap
+    const period = 24 * Math.pow(radius / 80, 1.5);     // seconds per lap
     const start = i * 2.4 + 0.6;                        // spread out (~137°, the "golden angle") so they never bunch up
 
     const ring = el("circle", { class: "ring", r: radius, style: `color:${colour(app.id)}` });
